@@ -154,17 +154,23 @@ A modern, conversational AI voice assistant with a sleek chat interface. Talk to
 
 ```
 voice-agent/
-├── main.py                 # FastAPI backend server
-├── requirements.txt        # Python dependencies
-├── .env                   # Environment variables (create this)
-├── README.md              # Project documentation
-├── static/
-│   ├── index.html         # Frontend HTML
-│   ├── style.css          # CSS styling
-│   └── script.js          # JavaScript logic (inline in HTML)
-├── uploads/               # Temporary audio files
-├── .venv/                 # Virtual environment
-└── .vscode/               # VS Code settings
+├── main.py                    # ✅ Clean 70-line main app
+├── config.py                  # ✅ Configuration management
+├── schemas.py                 # ✅ Pydantic models
+├── utils.py                   # ✅ Helper functions
+├── routes/                    # ✅ Organized API routes
+│   ├── __init__.py           
+│   ├── audio.py              # 🎵 Audio processing endpoints
+│   ├── chat.py               # 💬 Chat & conversation endpoints
+│   └── system.py             # ⚙️ System & utility endpoints
+├── static/                    # ✅ Frontend files
+│   ├── index.html
+│   └── style.css
+├── uploads/                   # ✅ File uploads
+├── .env                       # ✅ Environment variables
+├── requirements.txt           # ✅ Dependencies
+└── README.md                 # ✅ Documentation
+
 ```
 
 ## 🎯 API Endpoints
