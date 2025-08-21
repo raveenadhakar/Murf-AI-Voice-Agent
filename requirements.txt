@@ -1,0 +1,14 @@
+fastapi==0.104.1
+uvicorn==0.24.0
+websockets==12.0
+assemblyai==0.21.0
+google-generativeai==0.3.2
+google-genai
+python-multipart==0.0.6
+python-dotenv==1.0.0
+murf==1.0.0
+openai==1.3.8
+httpx==0.25.2
+aiohttp==3.9.1
+requests
+tavily-python==0.3.3

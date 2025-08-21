@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head></head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MARVIS - AI Assistant</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🤖 MARVIS</h1>
+            <p class="subtitle">Machine-based Assistant for Research, Voice, and Interactive Services</p>
+            <div class="header-controls">
+                <div class="status-indicator" id="statusIndicator">Ready</div>
+                <button class="settings-button" id="settingsButton" title="Settings">⚙️</button>
+            </div>
+        </div>
+
+        <!-- Settings Sidebar -->
+        <div class="settings-sidebar" id="settingsSidebar">
+            <div class="settings-header">
+                <h3>⚙️ API Configuration</h3>
+                <button class="close-settings" id="closeSettings">✕</button>
+            </div>
+            
+            <div class="settings-content">
+                <div class="settings-section">
+                    <h4>🤖 AI Services</h4>
+                    
+                    <div class="api-key-group">
+                        <label for="geminiKey">Google Gemini API Key</label>
+                        <div class="input-with-status">
+                            <input type="password" id="geminiKey" placeholder="Enter Gemini API key..." />
+                            <span class="key-status" id="geminiStatus">❌</span>
+                        </div>
+                        <small>Required for AI conversations</small>
+                    </div>
+
+                    <div class="api-key-group">
+                        <label for="assemblyaiKey">AssemblyAI API Key</label>
+                        <div class="input-with-status">
+                            <input type="password" id="assemblyaiKey" placeholder="Enter AssemblyAI API key..." />
+                            <span class="key-status" id="assemblyaiStatus">❌</span>
+                        </div>
+                        <small>Required for voice transcription</small>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>🔍 Search & Information</h4>
+                    
+                    <div class="api-key-group">
+                        <label for="tavilyKey">Tavily API Key</label>
+                        <div class="input-with-status">
+                            <input type="password" id="tavilyKey" placeholder="Enter Tavily API key..." />
+                            <span class="key-status" id="tavilyStatus">❌</span>
+                        </div>
+                        <small>Required for weather & news search</small>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4>🎵 Text-to-Speech (Optional)</h4>
+                    
+                    <div class="api-key-group">
+                        <label for="openaiKey">OpenAI API Key</label>
+                        <div class="input-with-status">
+                            <input type="password" id="openaiKey" placeholder="Enter OpenAI API key..." />
+                            <span class="key-status" id="openaiStatus">❌</span>
+                        </div>
+                        <small>For high-quality voice synthesis</small>
+                    </div>
+
+                    <div class="api-key-group">
+                        <label for="elevenlabsKey">ElevenLabs API Key</label>
+                        <div class="input-with-status">
+                            <input type="password" id="elevenlabsKey" placeholder="Enter ElevenLabs API key..." />
+                            <span class="key-status" id="elevenlabsStatus">❌</span>
+                        </div>
+                        <small>For premium voice synthesis</small>
+                    </div>
+
+                    <div class="api-key-group">
+                        <label for="murfKey">Murf API Key</label>
+                        <div class="input-with-status">
+                            <input type="password" id="murfKey" placeholder="Enter Murf API key..." />
+                            <span class="key-status" id="murfStatus">❌</span>
+                        </div>
+                        <small>Alternative voice synthesis</small>
+                    </div>
+                </div>
+
+                <div class="settings-actions">
+                    <button class="save-settings-btn" id="saveSettings">💾 Save Configuration</button>
+                    <button class="test-connection-btn" id="testConnection">🔗 Test Connection</button>
+                    <button class="clear-settings-btn" id="clearSettings">🗑️ Clear All</button>
+                </div>
+
+                <div class="settings-info">
+                    <p><strong>💡 Tips:</strong></p>
+                    <ul>
+                        <li>API keys are stored locally in your browser</li>
+                        <li>Gemini & AssemblyAI are required for basic functionality</li>
+                        <li>Other services are optional enhancements</li>
+                        <li>Keys are sent securely to the server for each request</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Container -->
+        <div class="chat-container" id="chatContainer">
+            <!-- Welcome Message -->
+            <div class="message ai-message">
+                <div class="message-content">
+                    Hello! I'm MARVIS, your AI assistant. How can I help you today?
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <!-- Voice Button -->
+            <button class="voice-button" id="voiceButton">
+                <div class="mic-icon" id="micIcon">🎤</div>
+                <div class="listening-indicator" id="listeningIndicator">Listening...</div>
+            </button>
+
+            <!-- Text Input -->
+            <div class="text-input-container" id="textInputContainer" style="display: none;">
+                <input type="text" id="textInput" placeholder="Type your message..." />
+                <button class="send-button" id="sendButton">Send</button>
+            </div>
+
+            <!-- Toggle Button -->
+            <button class="toggle-input-button" id="toggleInputButton">💬</button>
+
+
+        </div>
+
+        <!-- Settings Overlay -->
+        <div class="settings-overlay" id="settingsOverlay"></div>
+    </div>
+
+    <script>
+        // Global variables
+        let websocket = null;
+        let isRecording = false;
+        let isConnected = false;
+        let chatHistory = [];
+        let currentRecognition = null;
+        let inputMode = 'voice'; // 'voice' or 'text'
+        let speechTimeout = null;
+        let userApiKeys = {};
+
+        // DOM elements
+        const voiceButton = document.getElementById('voiceButton');
+        const micIcon = document.getElementById('micIcon');
+        const listeningIndicator = document.getElementById('listeningIndicator');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const chatContainer = document.getElementById('chatContainer');
+        const textInputContainer = document.getElementById('textInputContainer');
+        const textInput = document.getElementById('textInput');
+        const sendButton = document.getElementById('sendButton');
+        const toggleInputButton = document.getElementById('toggleInputButton');
+        
+        // Settings elements
+        const settingsButton = document.getElementById('settingsButton');
+        const settingsSidebar = document.getElementById('settingsSidebar');
+        const closeSettings = document.getElementById('closeSettings');
+        const saveSettings = document.getElementById('saveSettings');
+        const testConnection = document.getElementById('testConnection');
+        const clearSettings = document.getElementById('clearSettings');
+
+        // Initialize WebSocket connection
+        function initWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            try {
+                websocket = new WebSocket(wsUrl);
+
+                websocket.onopen = () => {
+                    isConnected = true;
+                    updateStatus('Connected', 'connected');
+                };
+
+                websocket.onmessage = (event) => {
+                    handleWebSocketMessage(JSON.parse(event.data));
+                };
+
+                websocket.onclose = () => {
+                    isConnected = false;
+                    updateStatus('Disconnected', 'error');
+                    // Auto-reconnect after 3 seconds
+                    setTimeout(initWebSocket, 3000);
+                };
+
+                websocket.onerror = (error) => {
+                    updateStatus('Connection Error', 'error');
+                };
+
+            } catch (error) {
+                updateStatus('Connection Failed', 'error');
+                setTimeout(initWebSocket, 3000);
+            }
+        }
+
+        // Handle WebSocket messages
+        function handleWebSocketMessage(data) {
+            console.log('WebSocket message received:', data);
+
+            switch (data.type) {
+                case 'transcript':
+                    if (data.transcript_type === 'partial') {
+                        updateTranscript(data.text, false);
+                    } else if (data.transcript_type === 'final') {
+                        updateTranscript(data.text, true);
+                    }
+                    break;
+
+                case 'turn_end':
+                    // User message already added in speech recognition
+                    console.log('Turn ended with transcript:', data.final_transcript);
+                    break;
+
+                case 'llm_start':
+                    console.log('LLM started processing');
+                    showTypingIndicator();
+                    break;
+
+                case 'llm_chunk':
+                    updateAIResponse(data.chunk);
+                    break;
+
+                case 'llm_complete':
+                    console.log('LLM completed response');
+                    hideTypingIndicator();
+                    updateStatus('Ready', 'ready');
+                    break;
+
+                case 'tts_text':
+                    playTextToSpeech(data.text);
+                    break;
+
+                case 'tts_error':
+                    updateStatus('Audio Error', 'error');
+                    break;
+
+                default:
+                    console.log('Unknown message type:', data.type);
+            }
+        }
+
+        // Speech Recognition
+        function startSpeechRecognition() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                updateStatus('Speech recognition not supported', 'error');
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            currentRecognition = new SpeechRecognition();
+
+            currentRecognition.continuous = false;
+            currentRecognition.interimResults = true;
+            currentRecognition.lang = 'en-US';
+            currentRecognition.maxAlternatives = 1;
+
+            currentRecognition.onstart = () => {
+                isRecording = true;
+                updateVoiceButton(true);
+                updateStatus('Listening...', 'listening');
+
+                // Set a timeout to stop listening after 10 seconds
+                speechTimeout = setTimeout(() => {
+                    if (isRecording) {
+                        console.log('Speech timeout - stopping recognition');
+                        stopSpeechRecognition();
+                        updateStatus('Listening timeout', 'error');
+                    }
+                }, 10000);
+            };
+
+            currentRecognition.onresult = (event) => {
+                let transcript = '';
+                let isFinal = false;
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        isFinal = true;
+                    }
+                }
+
+                console.log('Speech result:', { transcript, isFinal, confidence: event.results[0]?.[0]?.confidence });
+
+                if (isFinal && transcript.trim().length > 0) {
+                    console.log('Final transcript:', transcript);
+
+                    // Add user message to chat immediately
+                    addMessage(transcript.trim(), 'user');
+
+                    // Send final transcript to backend
+                    if (websocket && websocket.readyState === WebSocket.OPEN) {
+                        websocket.send(JSON.stringify({
+                            type: 'browser_transcript',
+                            text: transcript.trim()
+                        }));
+                        updateStatus('Processing...', 'processing');
+                    } else {
+                        updateStatus('Not connected', 'error');
+                    }
+                } else if (transcript.trim().length > 0) {
+                    // Show partial transcript in status
+                    updateStatus(`Listening: "${transcript.trim()}"`, 'listening');
+                }
+            };
+
+            currentRecognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                if (event.error === 'no-speech') {
+                    updateStatus('No speech detected. Try again.', 'error');
+                } else if (event.error === 'audio-capture') {
+                    updateStatus('Microphone not accessible', 'error');
+                } else if (event.error === 'not-allowed') {
+                    updateStatus('Microphone permission denied', 'error');
+                } else {
+                    updateStatus(`Speech error: ${event.error}`, 'error');
+                }
+                stopSpeechRecognition();
+            };
+
+            currentRecognition.onend = () => {
+                console.log('Speech recognition ended');
+                if (isRecording) {
+                    // If we're still supposed to be recording, there might have been no speech
+                    updateStatus('No speech detected', 'error');
+                }
+                stopSpeechRecognition();
+            };
+
+            try {
+                currentRecognition.start();
+            } catch (error) {
+                updateStatus('Failed to start speech recognition', 'error');
+                stopSpeechRecognition();
+            }
+        }
+
+        function stopSpeechRecognition() {
+            if (currentRecognition) {
+                currentRecognition.stop();
+                currentRecognition = null;
+            }
+            if (speechTimeout) {
+                clearTimeout(speechTimeout);
+                speechTimeout = null;
+            }
+            isRecording = false;
+            updateVoiceButton(false);
+            updateStatus('Ready', 'ready');
+        }
+
+        // UI Updates
+        function updateVoiceButton(listening) {
+            if (listening) {
+                voiceButton.classList.add('listening');
+                micIcon.style.display = 'none';
+                listeningIndicator.style.display = 'block';
+            } else {
+                voiceButton.classList.remove('listening');
+                micIcon.style.display = 'block';
+                listeningIndicator.style.display = 'none';
+            }
+        }
+
+        function updateStatus(message, type) {
+            statusIndicator.textContent = message;
+            statusIndicator.className = `status-indicator ${type}`;
+        }
+
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = text;
+
+            messageDiv.appendChild(contentDiv);
+            chatContainer.appendChild(messageDiv);
+
+            // Scroll to bottom
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            // Add to history
+            chatHistory.push({ sender, text, timestamp: new Date() });
+        }
+
+        let currentAIMessage = null;
+
+        function showTypingIndicator() {
+            currentAIMessage = document.createElement('div');
+            currentAIMessage.className = 'message ai-message typing';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+
+            currentAIMessage.appendChild(contentDiv);
+            chatContainer.appendChild(currentAIMessage);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function updateAIResponse(chunk) {
+            if (!currentAIMessage) {
+                currentAIMessage = document.createElement('div');
+                currentAIMessage.className = 'message ai-message';
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                contentDiv.textContent = '';
+
+                currentAIMessage.appendChild(contentDiv);
+                chatContainer.appendChild(currentAIMessage);
+            }
+
+            const contentDiv = currentAIMessage.querySelector('.message-content');
+            contentDiv.textContent += chunk;
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            if (currentAIMessage) {
+                currentAIMessage.classList.remove('typing');
+                currentAIMessage = null;
+            }
+        }
+
+
+
+        function updateTranscript(text, isFinal) {
+            // Show transcript in real-time (optional)
+            if (isFinal) {
+                updateStatus('Processing...', 'processing');
+            }
+        }
+
+        // Text-to-Speech
+        function playTextToSpeech(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.9;
+                utterance.pitch = 1.0;
+                utterance.volume = 0.8;
+                speechSynthesis.speak(utterance);
+            }
+        }
+
+        // Send text message
+        function sendTextMessage() {
+            const text = textInput.value.trim();
+            if (!text) return;
+
+            // Add user message to chat immediately
+            addMessage(text, 'user');
+
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(JSON.stringify({
+                    type: 'browser_transcript',
+                    text: text
+                }));
+
+                textInput.value = '';
+                updateStatus('Processing...', 'processing');
+            } else {
+                updateStatus('Not connected', 'error');
+            }
+        }
+
+        // Toggle input mode
+        function toggleInputMode() {
+            if (inputMode === 'voice') {
+                inputMode = 'text';
+                voiceButton.style.display = 'none';
+                textInputContainer.style.display = 'flex';
+                toggleInputButton.textContent = '🎤';
+                textInput.focus();
+            } else {
+                inputMode = 'voice';
+                voiceButton.style.display = 'flex';
+                textInputContainer.style.display = 'none';
+                toggleInputButton.textContent = '💬';
+            }
+        }
+
+        // Event Listeners
+        voiceButton.addEventListener('click', () => {
+            if (!isConnected) {
+                updateStatus('Connecting...', 'connecting');
+                initWebSocket();
+                return;
+            }
+
+            if (isRecording) {
+                stopSpeechRecognition();
+            } else {
+                startSpeechRecognition();
+            }
+        });
+
+        sendButton.addEventListener('click', sendTextMessage);
+
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendTextMessage();
+            }
+        });
+
+        toggleInputButton.addEventListener('click', toggleInputMode);
+
+
+
+        // Settings Management
+        function loadApiKeys() {
+            const saved = localStorage.getItem('marvis_api_keys');
+            if (saved) {
+                userApiKeys = JSON.parse(saved);
+                
+                // Populate input fields
+                document.getElementById('geminiKey').value = userApiKeys.gemini || '';
+                document.getElementById('assemblyaiKey').value = userApiKeys.assemblyai || '';
+                document.getElementById('tavilyKey').value = userApiKeys.tavily || '';
+                document.getElementById('openaiKey').value = userApiKeys.openai || '';
+                document.getElementById('elevenlabsKey').value = userApiKeys.elevenlabs || '';
+                document.getElementById('murfKey').value = userApiKeys.murf || '';
+                
+                updateKeyStatuses();
+            }
+        }
+
+        function saveApiKeys() {
+            userApiKeys = {
+                gemini: document.getElementById('geminiKey').value.trim(),
+                assemblyai: document.getElementById('assemblyaiKey').value.trim(),
+                tavily: document.getElementById('tavilyKey').value.trim(),
+                openai: document.getElementById('openaiKey').value.trim(),
+                elevenlabs: document.getElementById('elevenlabsKey').value.trim(),
+                murf: document.getElementById('murfKey').value.trim()
+            };
+            
+            localStorage.setItem('marvis_api_keys', JSON.stringify(userApiKeys));
+            updateKeyStatuses();
+            
+            // Show success message
+            updateStatus('API keys saved successfully!', 'connected');
+            setTimeout(() => updateStatus('Ready', 'ready'), 2000);
+        }
+
+        function clearApiKeys() {
+            if (confirm('Are you sure you want to clear all API keys?')) {
+                localStorage.removeItem('marvis_api_keys');
+                userApiKeys = {};
+                
+                // Clear input fields
+                document.getElementById('geminiKey').value = '';
+                document.getElementById('assemblyaiKey').value = '';
+                document.getElementById('tavilyKey').value = '';
+                document.getElementById('openaiKey').value = '';
+                document.getElementById('elevenlabsKey').value = '';
+                document.getElementById('murfKey').value = '';
+                
+                updateKeyStatuses();
+                updateStatus('API keys cleared', 'error');
+            }
+        }
+
+        function updateKeyStatuses() {
+            const keys = ['gemini', 'assemblyai', 'tavily', 'openai', 'elevenlabs', 'murf'];
+            
+            keys.forEach(key => {
+                const status = document.getElementById(`${key}Status`);
+                const hasKey = userApiKeys[key] && userApiKeys[key].length > 0;
+                status.textContent = hasKey ? '✅' : '❌';
+                status.title = hasKey ? 'API key configured' : 'API key missing';
+            });
+        }
+
+        function toggleSettings() {
+            const overlay = document.getElementById('settingsOverlay');
+            settingsSidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        }
+
+        async function testApiConnection() {
+            updateStatus('Testing API connections...', 'processing');
+            
+            try {
+                const response = await fetch('/test-api-keys', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(userApiKeys)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    updateStatus('API connections successful!', 'connected');
+                } else {
+                    updateStatus('Some API keys failed validation', 'error');
+                }
+                
+                // Update individual key statuses based on test results
+                Object.keys(result.results || {}).forEach(key => {
+                    const status = document.getElementById(`${key}Status`);
+                    if (status) {
+                        status.textContent = result.results[key] ? '✅' : '❌';
+                    }
+                });
+                
+            } catch (error) {
+                updateStatus('Connection test failed', 'error');
+                console.error('API test error:', error);
+            }
+        }
+
+        // Enhanced WebSocket initialization with API keys
+        function initWebSocketWithKeys() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            try {
+                websocket = new WebSocket(wsUrl);
+
+                websocket.onopen = () => {
+                    isConnected = true;
+                    updateStatus('Connected', 'connected');
+                    
+                    // Send API keys to server
+                    if (Object.keys(userApiKeys).length > 0) {
+                        websocket.send(JSON.stringify({
+                            type: 'api_keys',
+                            keys: userApiKeys
+                        }));
+                    }
+                };
+
+                websocket.onmessage = (event) => {
+                    handleWebSocketMessage(JSON.parse(event.data));
+                };
+
+                websocket.onclose = () => {
+                    isConnected = false;
+                    updateStatus('Disconnected', 'error');
+                    setTimeout(initWebSocketWithKeys, 3000);
+                };
+
+                websocket.onerror = (error) => {
+                    updateStatus('Connection Error', 'error');
+                };
+
+            } catch (error) {
+                updateStatus('Connection Failed', 'error');
+                setTimeout(initWebSocketWithKeys, 3000);
+            }
+        }
+
+        // Settings Event Listeners
+        settingsButton.addEventListener('click', toggleSettings);
+        closeSettings.addEventListener('click', toggleSettings);
+        document.getElementById('settingsOverlay').addEventListener('click', toggleSettings);
+        saveSettings.addEventListener('click', saveApiKeys);
+        testConnection.addEventListener('click', testApiConnection);
+        clearSettings.addEventListener('click', clearApiKeys);
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            loadApiKeys();
+            initWebSocketWithKeys();
+        });
+    </script>
+</body>
+
+</html>

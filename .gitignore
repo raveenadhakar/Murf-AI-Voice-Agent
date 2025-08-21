@@ -1,0 +1,21 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment files
+.env
+.env.*
+
+# Node modules
+node_modules/
+
+# Audio & media files
+*.wav
+*.webm
+
+# VSCode settings
+.vscode/
