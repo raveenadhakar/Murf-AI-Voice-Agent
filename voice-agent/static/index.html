@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voice Assistant</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* Emergency inline CSS to test */
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%) !important;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            margin: 0 !important;
+            padding: 20px !important;
+            height: 100vh !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+        }
+        .app-container {
+            background: rgba(42, 52, 65, 0.95) !important;
+            border-radius: 20px !important;
+            padding: 20px !important;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            width: 100% !important;
+            max-width: 600px !important;
+            height: 85vh !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        .header h1 {
+            color: #00d4aa !important;
+            font-size: 24px !important;
+            margin: 0 !important;
+            text-align: center !important;
+        }
+        .status-indicator {
+            color: #00d4aa !important;
+            background: rgba(0, 212, 170, 0.2) !important;
+            border: 1px solid #00d4aa !important;
+            border-radius: 20px !important;
+            padding: 8px 16px !important;
+            font-size: 14px !important;
+        }
+        .conversation-area {
+            flex: 1 !important;
+            background: rgba(30, 42, 58, 0.8) !important;
+            border-radius: 15px !important;
+            margin: 20px 0 !important;
+            padding: 20px !important;
+            color: white !important;
+        }
+        .record-button {
+            width: 90px !important;
+            height: 90px !important;
+            border-radius: 50% !important;
+            border: none !important;
+            background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%) !important;
+            color: white !important;
+            cursor: pointer !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            margin: 0 auto !important;
+        }
+        .clear-button {
+            background: rgba(231, 76, 60, 0.2) !important;
+            border: 1px solid #e74c3c !important;
+            color: #e74c3c !important;
+            padding: 12px 24px !important;
+            border-radius: 25px !important;
+            cursor: pointer !important;
+            margin: 10px auto !important;
+            display: block !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>AI Voice Assistant</h1>
+            <div class="status-indicator" id="statusIndicator">Ready</div>
+        </div>
+
+        <!-- Conversation Area -->
+        <div class="conversation-area" id="conversationArea">
+            <div class="welcome-message">
+                <div class="ai-message">
+                    <div class="message-content">
+                        Hello! I'm your AI voice assistant. Press and hold the microphone button to start talking with me.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls-area">
+            <!-- Record Button -->
+            <div class="record-container">
+                <button class="record-button" id="recordButton">
+                    <div class="button-content">
+                        <div class="mic-icon">🎙️</div>
+                        <div class="button-text" id="buttonText">Tap to Talk</div>
+                    </div>
+                    <div class="pulse-ring"></div>
+                    <div class="pulse-ring-2"></div>
+                </button>
+            </div>
+
+            <!-- Clear Button -->
+            <button class="clear-button" id="clearButton">New Conversation</button>
+        </div>
+    </div>
+
+    <!-- Hidden Audio Player -->
+    <audio id="audioPlayer" preload="auto"></audio>
+
+<script>
+// DOM Elements
+const recordButton = document.getElementById('recordButton');
+const buttonText = document.getElementById('buttonText');
+const statusIndicator = document.getElementById('statusIndicator');
+const conversationArea = document.getElementById('conversationArea');
+const clearButton = document.getElementById('clearButton');
+const audioPlayer = document.getElementById('audioPlayer');
+
+// Global State
+let mediaRecorder;
+let audioChunks = [];
+let isRecording = false;
+let stream;
+let sessionId = null;
+let isProcessing = false;
+
+// Initialize Application
+function initializeApp() {
+    sessionId = generateSessionId();
+    updateStatus('Ready', 'ready');
+    loadChatHistory();
+}
+
+function generateSessionId() {
+    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+function updateStatus(message, type = 'ready') {
+    statusIndicator.textContent = message;
+    statusIndicator.className = `status-indicator ${type}`;
+}
+
+// Record Button Event Handler
+recordButton.addEventListener('click', async () => {
+    if (isProcessing) {
+        updateStatus('Please wait...', 'busy');
+        return;
+    }
+
+    if (!isRecording) {
+        await startRecording();
+    } else {
+        await stopRecording();
+    }
+});
+
+async function startRecording() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+            await processAudio(audioBlob);
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        
+        recordButton.classList.add('recording');
+        buttonText.textContent = 'Listening...';
+        updateStatus('Listening...', 'listening');
+
+    } catch (error) {
+        console.error('Microphone access error:', error);
+        updateStatus('Microphone access denied', 'error');
+    }
+}
+
+async function stopRecording() {
+    if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+        stream.getTracks().forEach(track => track.stop());
+        
+        isRecording = false;
+        recordButton.classList.remove('recording');
+        buttonText.textContent = 'Processing...';
+        updateStatus('Processing...', 'processing');
+    }
+}
+
+// Clear Conversation
+clearButton.addEventListener('click', async () => {
+    try {
+        await fetch(`/agent/chat/${sessionId}`, { method: 'DELETE' });
+        sessionId = generateSessionId();
+        
+        conversationArea.innerHTML = `
+            <div class="welcome-message">
+                <div class="ai-message">
+                    <div class="message-content">
+                        Hello! I'm your AI voice assistant. Press and hold the microphone button to start talking with me.
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        updateStatus('Ready for new conversation', 'ready');
+        buttonText.textContent = 'Tap to Talk';
+        
+    } catch (error) {
+        console.error('Error clearing conversation:', error);
+        updateStatus('Error clearing conversation', 'error');
+    }
+});
+
+// Add Message to Conversation
+function addMessage(text, sender, isError = false) {
+    // Remove welcome message if it exists
+    const welcomeMessage = conversationArea.querySelector('.welcome-message');
+    if (welcomeMessage) {
+        welcomeMessage.remove();
+    }
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}-message${isError ? ' error' : ''}`;
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.textContent = text;
+    
+    messageDiv.appendChild(contentDiv);
+    conversationArea.appendChild(messageDiv);
+    
+    // Smooth scroll to bottom
+    conversationArea.scrollTo({
+        top: conversationArea.scrollHeight,
+        behavior: 'smooth'
+    });
+}
+
+// Process Audio with AI
+async function processAudio(audioBlob) {
+    isProcessing = true;
+    
+    const formData = new FormData();
+    formData.append("file", audioBlob, "audio.webm");
+
+    try {
+        const response = await fetch(`/agent/chat/${sessionId}`, {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        // Add user message
+        addMessage(data.transcript || "Could not understand audio", 'user');
+        
+        // Add AI response
+        addMessage(data.llm_response, 'ai', data.fallback || data.tts_error);
+
+        // Play AI response audio
+        await playAIResponse(data);
+        
+        updateStatus('Ready', 'ready');
+        buttonText.textContent = 'Tap to Talk';
+
+    } catch (error) {
+        console.error('Processing error:', error);
+        addMessage("Network error", 'user');
+        addMessage("I'm having trouble connecting. Please try again.", 'ai', true);
+        
+        updateStatus('Error - Try again', 'error');
+        buttonText.textContent = 'Tap to Talk';
+    }
+    
+    isProcessing = false;
+}
+
+// Play AI Response Audio
+async function playAIResponse(data) {
+    let audioPlayed = false;
+    
+    if (data.audio_url && !data.tts_error) {
+        try {
+            audioPlayer.src = data.audio_url;
+            
+            audioPlayer.onended = () => {
+                updateStatus('Ready', 'ready');
+            };
+            
+            audioPlayer.onerror = () => {
+                playFallbackTTS(data.llm_response);
+            };
+            
+            await audioPlayer.play();
+            audioPlayed = true;
+            updateStatus('AI Speaking...', 'speaking');
+            
+        } catch (audioError) {
+            console.log('Audio playback failed, using fallback');
+            audioPlayed = false;
+        }
+    }
+    
+    if (!audioPlayed) {
+        playFallbackTTS(data.llm_response);
+    }
+}
+
+// Fallback Text-to-Speech
+function playFallbackTTS(text) {
+    if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        utterance.volume = 0.8;
+        
+        utterance.onstart = () => {
+            updateStatus('AI Speaking...', 'speaking');
+        };
+        
+        utterance.onend = () => {
+            updateStatus('Ready', 'ready');
+        };
+        
+        speechSynthesis.speak(utterance);
+    }
+}
+
+// Load Chat History
+async function loadChatHistory() {
+    try {
+        const response = await fetch(`/agent/chat/${sessionId}/history`);
+        const data = await response.json();
+        
+        if (data.messages && data.messages.length > 0) {
+            conversationArea.innerHTML = '';
+            
+            for (let i = 0; i < data.messages.length; i++) {
+                if (data.messages[i].role === "user") {
+                    addMessage(data.messages[i].content, 'user');
+                } else if (data.messages[i].role === "assistant") {
+                    addMessage(data.messages[i].content, 'ai');
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Error loading chat history:", error);
+    }
+}
+
+// Initialize the application
+initializeApp();
+
+</script>
+</body>
+</html>
